@@ -1,8 +1,13 @@
 use futures::stream::StreamExt;
+use pulldown_cmark::{Options, Parser as MarkdownParser};
+use pulldown_cmark_mdcat::{
+    resources::FileResourceHandler, Environment, Settings, TerminalProgram, TerminalSize, Theme,
+};
 use reqwest::Response;
 use serde_json::Value;
 use std::error::Error;
-use std::io::{self, Write};
+use std::io::{self, stdout, BufWriter, Write};
+use syntect::parsing::SyntaxSet;
 
 pub struct Renderer;
 
@@ -37,6 +42,30 @@ impl Renderer {
                             }
 
                             if json_str == "[DONE]" {
+                                // 用于存储生成的HTML
+
+                                // 将Markdown解析为HTML
+                                pulldown_cmark_mdcat::push_tty(
+                                    &Settings {
+                                        terminal_capabilities: TerminalProgram::detect()
+                                            .capabilities(),
+                                        terminal_size: TerminalSize::default(),
+                                        syntax_set: &SyntaxSet::load_defaults_newlines(),
+                                        theme: Theme::default(),
+                                    },
+                                    &Environment::for_local_directory(
+                                        &tempfile::tempdir()?.path(),
+                                    )?,
+                                    &FileResourceHandler::new(104_857_600), // TODO: Maybe make this be a DispatchingResourceHandler?
+                                    &mut BufWriter::new(stdout()),
+                                    MarkdownParser::new_ext(
+                                        &total_response.as_str(),
+                                        Options::ENABLE_FOOTNOTES
+                                            | Options::ENABLE_TABLES
+                                            | Options::ENABLE_STRIKETHROUGH,
+                                    ),
+                                )?;
+
                                 // End of the response stream
                                 print!("\n");
                                 return Ok(total_response);
@@ -49,7 +78,6 @@ impl Renderer {
                                     if let Some(content) =
                                         json["choices"][0]["delta"]["content"].as_str()
                                     {
-                                        print!("{}", content); // Print the extracted content
                                         io::stdout().flush().unwrap(); // Flush output to ensure immediate printing
                                         total_response.push_str(content);
                                     }
