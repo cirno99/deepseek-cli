@@ -23,6 +23,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .expect("Time went backwards")
         .as_secs();
     let mut first_prompt = true;
+    let first_prompt_content = init_args.prompt.join(" ");
 
     loop {
         let mut prompt = String::new();
@@ -49,12 +50,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let chatlog_path = dirs::home_dir()
             .expect("Failed to get home directory")
             .join(".chatgpt")
-            .join(
+            .join(format!(
+                "{}_{}",
+                &first_prompt_content,
                 process::getppid()
                     .expect("Failed to get parent process id")
                     .as_raw_nonzero()
-                    .to_string(),
-            )
+                    .to_string()
+            ))
             .join(format!("{}", timestamp))
             .join("chatlog.json");
 
